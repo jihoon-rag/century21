@@ -1,0 +1,8 @@
+{
+  "name": "Century 21 Smart CRM",
+  "description": "An integrated AI-powered CRM for real estate agents including customer management, scheduling, statistics, and a master admin dashboard.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

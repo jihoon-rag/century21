@@ -2,11 +2,13 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, CartesianGrid } from 'recharts';
+import GoalSettingModal from '../components/GoalSettingModal';
 
 const StatisticsView: React.FC = () => {
-  const { customers, contactRecords } = useApp();
+  const { customers, contactRecords, goals } = useApp();
   const [periodTab, setPeriodTab] = useState<'weekly' | 'monthly' | 'yearly'>('weekly');
   const [weekOffset, setWeekOffset] = useState(0);
+  const [goalModalOpen, setGoalModalOpen] = useState(false);
 
   // Calculate stats from real data
   const stats = useMemo(() => {
@@ -69,6 +71,15 @@ const StatisticsView: React.FC = () => {
   const handlePrevPeriod = () => setWeekOffset(prev => prev - 1);
   const handleNextPeriod = () => setWeekOffset(prev => Math.min(prev + 1, 0));
 
+  // Get current month goal
+  const currentMonthGoal = goals.find(g => g.type === 'monthly' && g.period === '2024-05');
+  const currentQuarterGoal = goals.find(g => g.type === 'quarterly' && g.period === '2024-Q2');
+
+  const calculateProgress = (actual: number = 0, target: number) => {
+    if (target === 0) return 0;
+    return Math.min(100, Math.round((actual / target) * 100));
+  };
+
   return (
     <div className="space-y-6 lg:space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -86,6 +97,146 @@ const StatisticsView: React.FC = () => {
             </p>
           </div>
         ))}
+      </div>
+
+      {/* Goal Progress Section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <h2 className="text-xl lg:text-2xl font-black border-l-4 border-primary pl-4">목표 달성률</h2>
+        <button
+          onClick={() => setGoalModalOpen(true)}
+          className="flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-gray-50 transition-colors"
+        >
+          <span className="material-symbols-outlined text-sm text-primary">flag</span>
+          목표 설정
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+        {/* Monthly Goal */}
+        <div className="bg-white dark:bg-[#1A1A1A] p-4 lg:p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-600 text-[10px] font-bold rounded">월간</span>
+              <h3 className="font-bold text-sm lg:text-base">2024년 5월 목표</h3>
+            </div>
+          </div>
+          
+          {currentMonthGoal ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">신규 등록</span>
+                  <span className="font-bold">
+                    <span className="text-primary">{currentMonthGoal.actualRegistrations || 0}</span>
+                    <span className="text-gray-400"> / {currentMonthGoal.targetRegistrations}명</span>
+                  </span>
+                </div>
+                <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${calculateProgress(currentMonthGoal.actualRegistrations, currentMonthGoal.targetRegistrations) >= 100 ? 'bg-green-500' : 'bg-primary'}`}
+                    style={{ width: `${calculateProgress(currentMonthGoal.actualRegistrations, currentMonthGoal.targetRegistrations)}%` }}
+                  />
+                </div>
+                <p className="text-right text-[10px] font-bold text-gray-400">
+                  {calculateProgress(currentMonthGoal.actualRegistrations, currentMonthGoal.targetRegistrations)}% 달성
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Contact 기록</span>
+                  <span className="font-bold">
+                    <span className="text-secondary">{currentMonthGoal.actualContacts || 0}</span>
+                    <span className="text-gray-400"> / {currentMonthGoal.targetContacts}건</span>
+                  </span>
+                </div>
+                <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${calculateProgress(currentMonthGoal.actualContacts, currentMonthGoal.targetContacts) >= 100 ? 'bg-green-500' : 'bg-secondary'}`}
+                    style={{ width: `${calculateProgress(currentMonthGoal.actualContacts, currentMonthGoal.targetContacts)}%` }}
+                  />
+                </div>
+                <p className="text-right text-[10px] font-bold text-gray-400">
+                  {calculateProgress(currentMonthGoal.actualContacts, currentMonthGoal.targetContacts)}% 달성
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6 text-gray-400">
+              <span className="material-symbols-outlined text-3xl mb-2">flag</span>
+              <p className="text-xs">월간 목표가 설정되지 않았습니다</p>
+              <button
+                onClick={() => setGoalModalOpen(true)}
+                className="text-primary text-xs font-bold mt-2 hover:underline"
+              >
+                목표 설정하기
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Quarterly Goal */}
+        <div className="bg-white dark:bg-[#1A1A1A] p-4 lg:p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 bg-purple-100 text-purple-600 text-[10px] font-bold rounded">분기</span>
+              <h3 className="font-bold text-sm lg:text-base">2024년 Q2 목표</h3>
+            </div>
+          </div>
+          
+          {currentQuarterGoal ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">신규 등록</span>
+                  <span className="font-bold">
+                    <span className="text-primary">{currentQuarterGoal.actualRegistrations || 0}</span>
+                    <span className="text-gray-400"> / {currentQuarterGoal.targetRegistrations}명</span>
+                  </span>
+                </div>
+                <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${calculateProgress(currentQuarterGoal.actualRegistrations, currentQuarterGoal.targetRegistrations) >= 100 ? 'bg-green-500' : 'bg-primary'}`}
+                    style={{ width: `${calculateProgress(currentQuarterGoal.actualRegistrations, currentQuarterGoal.targetRegistrations)}%` }}
+                  />
+                </div>
+                <p className="text-right text-[10px] font-bold text-gray-400">
+                  {calculateProgress(currentQuarterGoal.actualRegistrations, currentQuarterGoal.targetRegistrations)}% 달성
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Contact 기록</span>
+                  <span className="font-bold">
+                    <span className="text-secondary">{currentQuarterGoal.actualContacts || 0}</span>
+                    <span className="text-gray-400"> / {currentQuarterGoal.targetContacts}건</span>
+                  </span>
+                </div>
+                <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${calculateProgress(currentQuarterGoal.actualContacts, currentQuarterGoal.targetContacts) >= 100 ? 'bg-green-500' : 'bg-secondary'}`}
+                    style={{ width: `${calculateProgress(currentQuarterGoal.actualContacts, currentQuarterGoal.targetContacts)}%` }}
+                  />
+                </div>
+                <p className="text-right text-[10px] font-bold text-gray-400">
+                  {calculateProgress(currentQuarterGoal.actualContacts, currentQuarterGoal.targetContacts)}% 달성
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6 text-gray-400">
+              <span className="material-symbols-outlined text-3xl mb-2">flag</span>
+              <p className="text-xs">분기 목표가 설정되지 않았습니다</p>
+              <button
+                onClick={() => setGoalModalOpen(true)}
+                className="text-primary text-xs font-bold mt-2 hover:underline"
+              >
+                목표 설정하기
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
@@ -192,6 +343,12 @@ const StatisticsView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Goal Setting Modal */}
+      <GoalSettingModal
+        isOpen={goalModalOpen}
+        onClose={() => setGoalModalOpen(false)}
+      />
     </div>
   );
 };

@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { Customer, ToDo } from '../types';
+import { Customer, ToDo, CustomerGroup, CustomerAttachment, Goal } from '../types';
 
 // Extended Types
 export interface ContactRecord {
@@ -39,9 +39,26 @@ interface AppContextType {
   // Customers
   customers: Customer[];
   addCustomer: (customer: Omit<Customer, 'id'>) => void;
+  addCustomers: (customers: Omit<Customer, 'id'>[]) => void; // Bulk add
   updateCustomer: (id: string, data: Partial<Customer>) => void;
   deleteCustomer: (id: string) => void;
   getCustomer: (id: string) => Customer | undefined;
+  
+  // Customer Groups
+  customerGroups: CustomerGroup[];
+  addCustomerGroup: (group: Omit<CustomerGroup, 'id'>) => void;
+  updateCustomerGroup: (id: string, data: Partial<CustomerGroup>) => void;
+  deleteCustomerGroup: (id: string) => void;
+  
+  // Customer Attachments
+  addAttachment: (customerId: string, attachment: Omit<CustomerAttachment, 'id'>) => void;
+  deleteAttachment: (customerId: string, attachmentId: string) => void;
+  
+  // Goals
+  goals: Goal[];
+  addGoal: (goal: Omit<Goal, 'id'>) => void;
+  updateGoal: (id: string, data: Partial<Goal>) => void;
+  deleteGoal: (id: string) => void;
   
   // Todos
   todos: ToDo[];
@@ -83,16 +100,16 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // Initial Mock Data
 const initialCustomers: Customer[] = [
-  { id: '1', name: '홍길동', phone: '010-1234-5678', lastContact: '2024.05.15', registrationDate: '2022.05.16', status: 'ACTIVE', contactDueDays: 3, isNew: true, tier: 'Platinum Elite' },
-  { id: '2', name: '삼성동 건물주', phone: '010-2345-6789', lastContact: '2024.05.31', registrationDate: '2022.01.08', status: 'ACTIVE', contactDueDays: 0, isNew: true, tier: 'Gold Medal' },
-  { id: '3', name: '홍길준', phone: '010-3456-7890', lastContact: '2024.04.14', registrationDate: '2022.04.15', status: 'ACTIVE', contactDueDays: -1, tier: 'Silver Link' },
+  { id: '1', name: '홍길동', phone: '010-1234-5678', lastContact: '2024.05.15', registrationDate: '2022.05.16', status: 'ACTIVE', contactDueDays: 3, isNew: true, tier: 'Platinum Elite', groups: ['1', '3'], email: 'hong@email.com', address: '서울시 강남구 역삼동' },
+  { id: '2', name: '삼성동 건물주', phone: '010-2345-6789', lastContact: '2024.05.31', registrationDate: '2022.01.08', status: 'ACTIVE', contactDueDays: 0, isNew: true, tier: 'Gold Medal', groups: ['1', '4'], email: 'samsung@email.com' },
+  { id: '3', name: '홍길준', phone: '010-3456-7890', lastContact: '2024.04.14', registrationDate: '2022.04.15', status: 'ACTIVE', contactDueDays: -1, tier: 'Silver Link', groups: ['5'] },
   { id: '4', name: '고길동', phone: '010-4567-8901', lastContact: '-', registrationDate: '2022.09.15', status: 'INACTIVE', contactDueDays: 99 },
   { id: '5', name: '고길순', phone: '02-555-0000', lastContact: '-', registrationDate: '2020.09.02', status: 'INACTIVE', contactDueDays: 99 },
-  { id: '6', name: '김중앙', phone: '010-5678-9012', lastContact: '2024.05.10', registrationDate: '2023.03.20', status: 'ACTIVE', contactDueDays: 5, tier: 'Gold Medal' },
-  { id: '7', name: '박서초', phone: '010-6789-0123', lastContact: '2024.05.18', registrationDate: '2023.06.15', status: 'ACTIVE', contactDueDays: 1, tier: 'Silver Link' },
-  { id: '8', name: '최강남', phone: '010-7890-1234', lastContact: '2024.05.20', registrationDate: '2024.01.10', status: 'ACTIVE', contactDueDays: 0, isNew: true, tier: 'Platinum Elite' },
-  { id: '9', name: '이송파', phone: '010-8901-2345', lastContact: '2024.05.05', registrationDate: '2022.11.25', status: 'ACTIVE', contactDueDays: -3 },
-  { id: '10', name: '정마포', phone: '010-9012-3456', lastContact: '2024.04.28', registrationDate: '2021.08.30', status: 'ACTIVE', contactDueDays: -7, tier: 'Gold Medal' },
+  { id: '6', name: '김중앙', phone: '010-5678-9012', lastContact: '2024.05.10', registrationDate: '2023.03.20', status: 'ACTIVE', contactDueDays: 5, tier: 'Gold Medal', groups: ['2', '4'] },
+  { id: '7', name: '박서초', phone: '010-6789-0123', lastContact: '2024.05.18', registrationDate: '2023.06.15', status: 'ACTIVE', contactDueDays: 1, tier: 'Silver Link', groups: ['3'] },
+  { id: '8', name: '최강남', phone: '010-7890-1234', lastContact: '2024.05.20', registrationDate: '2024.01.10', status: 'ACTIVE', contactDueDays: 0, isNew: true, tier: 'Platinum Elite', groups: ['1', '2'] },
+  { id: '9', name: '이송파', phone: '010-8901-2345', lastContact: '2024.05.05', registrationDate: '2022.11.25', status: 'ACTIVE', contactDueDays: -3, groups: ['4'] },
+  { id: '10', name: '정마포', phone: '010-9012-3456', lastContact: '2024.04.28', registrationDate: '2021.08.30', status: 'ACTIVE', contactDueDays: -7, tier: 'Gold Medal', groups: ['5'] },
 ];
 
 const initialTodos: ToDo[] = [
@@ -124,12 +141,28 @@ const initialNotifications: Notification[] = [
   { id: '3', title: '일정 알림', message: '오후 2시 홍길동 고객 미팅이 있습니다.', time: '2시간 전', read: true, type: 'info' },
 ];
 
+const initialCustomerGroups: CustomerGroup[] = [
+  { id: '1', name: 'VIP 고객', color: '#8B5CF6', description: '최우선 관리 대상 고객' },
+  { id: '2', name: '신규 상담', color: '#3B82F6', description: '첫 상담 진행 중인 고객' },
+  { id: '3', name: '계약 진행중', color: '#10B981', description: '계약 협의 중인 고객' },
+  { id: '4', name: '매물 관심', color: '#F59E0B', description: '특정 매물에 관심 있는 고객' },
+  { id: '5', name: '재계약 대상', color: '#EF4444', description: '재계약 시기가 다가온 고객' },
+];
+
+const initialGoals: Goal[] = [
+  { id: '1', type: 'monthly', period: '2024-05', targetRegistrations: 30, targetContacts: 100, actualRegistrations: 21, actualContacts: 62 },
+  { id: '2', type: 'monthly', period: '2024-04', targetRegistrations: 25, targetContacts: 80, actualRegistrations: 28, actualContacts: 95 },
+  { id: '3', type: 'quarterly', period: '2024-Q2', targetRegistrations: 90, targetContacts: 300, actualRegistrations: 49, actualContacts: 157 },
+];
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [todos, setTodos] = useState<ToDo[]>(initialTodos);
   const [contactRecords, setContactRecords] = useState<ContactRecord[]>(initialContactRecords);
   const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>(initialScheduleEvents);
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
+  const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>(initialCustomerGroups);
+  const [goals, setGoals] = useState<Goal[]>(initialGoals);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
@@ -142,6 +175,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newCustomer = { ...customer, id: generateId() };
     setCustomers(prev => [newCustomer, ...prev]);
     showToast('고객이 등록되었습니다.', 'success');
+  }, []);
+
+  const addCustomers = useCallback((newCustomers: Omit<Customer, 'id'>[]) => {
+    const customersWithIds = newCustomers.map(c => ({ ...c, id: generateId() }));
+    setCustomers(prev => [...customersWithIds, ...prev]);
+    showToast(`${newCustomers.length}명의 고객이 등록되었습니다.`, 'success');
   }, []);
 
   const updateCustomer = useCallback((id: string, data: Partial<Customer>) => {
@@ -157,6 +196,65 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const getCustomer = useCallback((id: string) => {
     return customers.find(c => c.id === id);
   }, [customers]);
+
+  // Customer Group operations
+  const addCustomerGroup = useCallback((group: Omit<CustomerGroup, 'id'>) => {
+    const newGroup = { ...group, id: generateId() };
+    setCustomerGroups(prev => [...prev, newGroup]);
+    showToast('그룹이 생성되었습니다.', 'success');
+  }, []);
+
+  const updateCustomerGroup = useCallback((id: string, data: Partial<CustomerGroup>) => {
+    setCustomerGroups(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
+    showToast('그룹이 수정되었습니다.', 'success');
+  }, []);
+
+  const deleteCustomerGroup = useCallback((id: string) => {
+    setCustomerGroups(prev => prev.filter(g => g.id !== id));
+    // Remove group from all customers
+    setCustomers(prev => prev.map(c => ({
+      ...c,
+      groups: c.groups?.filter(gId => gId !== id)
+    })));
+    showToast('그룹이 삭제되었습니다.', 'success');
+  }, []);
+
+  // Customer Attachment operations
+  const addAttachment = useCallback((customerId: string, attachment: Omit<CustomerAttachment, 'id'>) => {
+    const newAttachment = { ...attachment, id: generateId() };
+    setCustomers(prev => prev.map(c => 
+      c.id === customerId 
+        ? { ...c, attachments: [...(c.attachments || []), newAttachment] }
+        : c
+    ));
+    showToast('파일이 첨부되었습니다.', 'success');
+  }, []);
+
+  const deleteAttachment = useCallback((customerId: string, attachmentId: string) => {
+    setCustomers(prev => prev.map(c => 
+      c.id === customerId 
+        ? { ...c, attachments: c.attachments?.filter(a => a.id !== attachmentId) }
+        : c
+    ));
+    showToast('파일이 삭제되었습니다.', 'success');
+  }, []);
+
+  // Goal operations
+  const addGoal = useCallback((goal: Omit<Goal, 'id'>) => {
+    const newGoal = { ...goal, id: generateId() };
+    setGoals(prev => [...prev, newGoal]);
+    showToast('목표가 설정되었습니다.', 'success');
+  }, []);
+
+  const updateGoal = useCallback((id: string, data: Partial<Goal>) => {
+    setGoals(prev => prev.map(g => g.id === id ? { ...g, ...data } : g));
+    showToast('목표가 수정되었습니다.', 'success');
+  }, []);
+
+  const deleteGoal = useCallback((id: string) => {
+    setGoals(prev => prev.filter(g => g.id !== id));
+    showToast('목표가 삭제되었습니다.', 'success');
+  }, []);
 
   // Todo operations
   const addTodo = useCallback((todo: Omit<ToDo, 'id'>) => {
@@ -237,9 +335,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     <AppContext.Provider value={{
       customers,
       addCustomer,
+      addCustomers,
       updateCustomer,
       deleteCustomer,
       getCustomer,
+      customerGroups,
+      addCustomerGroup,
+      updateCustomerGroup,
+      deleteCustomerGroup,
+      addAttachment,
+      deleteAttachment,
+      goals,
+      addGoal,
+      updateGoal,
+      deleteGoal,
       todos,
       addTodo,
       toggleTodo,

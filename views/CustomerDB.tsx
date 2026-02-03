@@ -4,22 +4,27 @@ import { ViewType } from '../types';
 import { useApp } from '../context/AppContext';
 import ContactRecordModal from '../components/ContactRecordModal';
 import Modal from '../components/Modal';
+import ExcelUploadModal from '../components/ExcelUploadModal';
+import GroupManageModal from '../components/GroupManageModal';
 
 interface CustomerDBProps {
   navigateTo: (view: ViewType, id?: string) => void;
 }
 
 const CustomerDB: React.FC<CustomerDBProps> = ({ navigateTo }) => {
-  const { customers, deleteCustomer, updateCustomer, selectedCustomerIds, toggleCustomerSelection, selectAllCustomers, clearCustomerSelection, showToast } = useApp();
+  const { customers, deleteCustomer, updateCustomer, selectedCustomerIds, toggleCustomerSelection, selectAllCustomers, clearCustomerSelection, showToast, customerGroups } = useApp();
   
   const [searchName, setSearchName] = useState('');
   const [searchPhone, setSearchPhone] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [selectedGroupId, setSelectedGroupId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string } | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [groupModalOpen, setGroupModalOpen] = useState(false);
   
   const itemsPerPage = 5;
 
@@ -39,10 +44,47 @@ const CustomerDB: React.FC<CustomerDBProps> = ({ navigateTo }) => {
           matchesDate = matchesDate && regDate <= new Date(dateTo);
         }
       }
+
+      let matchesGroup = true;
+      if (selectedGroupId) {
+        matchesGroup = customer.groups?.includes(selectedGroupId) || false;
+      }
       
-      return matchesName && matchesPhone && matchesDate;
+      return matchesName && matchesPhone && matchesDate && matchesGroup;
     });
-  }, [customers, searchName, searchPhone, dateFrom, dateTo]);
+  }, [customers, searchName, searchPhone, dateFrom, dateTo, selectedGroupId]);
+
+  // Export to CSV
+  const handleExportCSV = () => {
+    const headers = ['고객명', '연락처', '이메일', '주소', '최근연락', '등록일', '상태', '메모'];
+    const rows = filteredCustomers.map(c => [
+      c.name,
+      c.phone,
+      c.email || '',
+      c.address || '',
+      c.lastContact,
+      c.registrationDate,
+      c.status === 'ACTIVE' ? '활성' : '비활성',
+      c.memo || ''
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `고객목록_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`${filteredCustomers.length}명의 고객 데이터가 다운로드되었습니다.`, 'success');
+  };
+
+  // Get group by ID
+  const getGroupById = (id: string) => customerGroups.find(g => g.id === id);
 
   // Paginate
   const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
@@ -103,28 +145,52 @@ const CustomerDB: React.FC<CustomerDBProps> = ({ navigateTo }) => {
     setSearchPhone('');
     setDateFrom('');
     setDateTo('');
+    setSelectedGroupId('');
     setCurrentPage(1);
   };
 
   return (
     <div className="space-y-4 lg:space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <h2 className="text-lg lg:text-2xl font-black flex items-center gap-2 lg:gap-3">
           <span className="material-symbols-outlined text-primary text-2xl lg:text-3xl">groups</span>
           고객 DB 관리
         </h2>
-        <button 
-          onClick={() => navigateTo('CUSTOMER_DETAIL')}
-          className="bg-primary hover:brightness-95 text-white px-3 lg:px-6 py-2 lg:py-2.5 rounded-lg text-[10px] lg:text-sm font-bold shadow-lg shadow-primary/20 transition-all flex items-center gap-1.5"
-        >
-          <span className="material-symbols-outlined text-sm lg:text-lg">person_add</span>
-          등록
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button 
+            onClick={() => setUploadModalOpen(true)}
+            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-[10px] lg:text-xs font-bold transition-all flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-sm text-green-500">upload_file</span>
+            <span className="hidden sm:inline">업로드</span>
+          </button>
+          <button 
+            onClick={handleExportCSV}
+            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-[10px] lg:text-xs font-bold transition-all flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-sm text-blue-500">download</span>
+            <span className="hidden sm:inline">다운로드</span>
+          </button>
+          <button 
+            onClick={() => setGroupModalOpen(true)}
+            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-[10px] lg:text-xs font-bold transition-all flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-sm text-purple-500">folder_special</span>
+            <span className="hidden sm:inline">그룹</span>
+          </button>
+          <button 
+            onClick={() => navigateTo('CUSTOMER_DETAIL')}
+            className="bg-primary hover:brightness-95 text-white px-3 lg:px-5 py-2 rounded-lg text-[10px] lg:text-xs font-bold shadow-lg shadow-primary/20 transition-all flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-sm lg:text-base">person_add</span>
+            등록
+          </button>
+        </div>
       </div>
 
       {/* Filter Section */}
       <div className="bg-white dark:bg-[#1A1A1A] p-4 lg:p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 lg:gap-6">
           <div className="space-y-1.5">
             <label className="text-[9px] lg:text-[10px] font-bold text-gray-400 uppercase tracking-widest">고객명</label>
             <input 
@@ -144,6 +210,19 @@ const CustomerDB: React.FC<CustomerDBProps> = ({ navigateTo }) => {
               value={searchPhone}
               onChange={(e) => setSearchPhone(e.target.value)}
             />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[9px] lg:text-[10px] font-bold text-gray-400 uppercase tracking-widest">그룹</label>
+            <select
+              className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-lg text-[11px] lg:text-sm p-2 lg:p-3"
+              value={selectedGroupId}
+              onChange={(e) => setSelectedGroupId(e.target.value)}
+            >
+              <option value="">전체</option>
+              {customerGroups.map(g => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
           </div>
           <div className="col-span-2 space-y-1.5">
             <label className="text-[9px] lg:text-[10px] font-bold text-gray-400 uppercase tracking-widest">등록일</label>
@@ -251,19 +330,40 @@ const CustomerDB: React.FC<CustomerDBProps> = ({ navigateTo }) => {
                       </span>
                     </td>
                     <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] lg:text-sm font-bold">{customer.name}</span>
-                        {customer.isNew && (
-                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[8px] font-bold rounded">NEW</span>
-                        )}
-                        {customer.tier && (
-                          <span className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${
-                            customer.tier === 'Platinum Elite' ? 'bg-purple-100 text-purple-600' :
-                            customer.tier === 'Gold Medal' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-gray-100 text-gray-600'
-                          }`}>
-                            {customer.tier.split(' ')[0]}
-                          </span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] lg:text-sm font-bold">{customer.name}</span>
+                          {customer.isNew && (
+                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[8px] font-bold rounded">NEW</span>
+                          )}
+                          {customer.tier && (
+                            <span className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${
+                              customer.tier === 'Platinum Elite' ? 'bg-purple-100 text-purple-600' :
+                              customer.tier === 'Gold Medal' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {customer.tier.split(' ')[0]}
+                            </span>
+                          )}
+                        </div>
+                        {customer.groups && customer.groups.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {customer.groups.slice(0, 2).map(gId => {
+                              const group = getGroupById(gId);
+                              return group ? (
+                                <span
+                                  key={gId}
+                                  className="px-1.5 py-0.5 text-[7px] lg:text-[8px] font-bold rounded text-white"
+                                  style={{ backgroundColor: group.color }}
+                                >
+                                  {group.name}
+                                </span>
+                              ) : null;
+                            })}
+                            {customer.groups.length > 2 && (
+                              <span className="text-[8px] text-gray-400">+{customer.groups.length - 2}</span>
+                            )}
+                          </div>
                         )}
                       </div>
                     </td>
@@ -366,6 +466,18 @@ const CustomerDB: React.FC<CustomerDBProps> = ({ navigateTo }) => {
           </div>
         </div>
       </Modal>
+
+      {/* Excel Upload Modal */}
+      <ExcelUploadModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+      />
+
+      {/* Group Management Modal */}
+      <GroupManageModal
+        isOpen={groupModalOpen}
+        onClose={() => setGroupModalOpen(false)}
+      />
     </div>
   );
 };

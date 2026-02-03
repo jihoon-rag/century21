@@ -10,6 +10,22 @@ export type ViewType =
   | 'MASTER_ADMIN'
   | 'AGENT_MANAGEMENT';
 
+export interface CustomerAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  uploadedAt: string;
+  dataUrl?: string; // Base64 for simulation
+}
+
+export interface CustomerGroup {
+  id: string;
+  name: string;
+  color: string;
+  description?: string;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -20,6 +36,22 @@ export interface Customer {
   tier?: 'Platinum Elite' | 'Gold Medal' | 'Silver Link';
   contactDueDays: number; // e.g., +3, 0 (Today), -1
   isNew?: boolean;
+  photo?: string; // Base64 or URL
+  memo?: string;
+  email?: string;
+  address?: string;
+  groups?: string[]; // Group IDs
+  attachments?: CustomerAttachment[];
+}
+
+export interface Goal {
+  id: string;
+  type: 'monthly' | 'quarterly' | 'yearly';
+  period: string; // e.g., "2024-05" for monthly, "2024-Q2" for quarterly
+  targetRegistrations: number;
+  targetContacts: number;
+  actualRegistrations?: number;
+  actualContacts?: number;
 }
 
 export interface ToDo {

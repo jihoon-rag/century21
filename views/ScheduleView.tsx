@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import Modal from '../components/Modal';
 
 const ScheduleView: React.FC = () => {
-  const { todos, toggleTodo, addTodo, deleteTodo, scheduleEvents, addScheduleEvent, contactRecords, customers, showToast } = useApp();
+  const { todos, toggleTodo, addTodo, deleteTodo, restoreLastDeletedTodo, scheduleEvents, addScheduleEvent, contactRecords, customers, showToast } = useApp();
   
   const [currentYear, setCurrentYear] = useState(2024);
   const [currentMonth, setCurrentMonth] = useState(5); // May
@@ -244,7 +244,14 @@ const ScheduleView: React.FC = () => {
                               >
                               </button>
                               <button 
-                                onClick={() => deleteTodo(todo.id)}
+                                onClick={() => {
+                                  deleteTodo(todo.id);
+                                  // 삭제 후 되돌리기 옵션이 있는 Toast 표시
+                                  showToast('할 일이 삭제되었습니다.', 'success', {
+                                    label: '되돌리기',
+                                    onClick: restoreLastDeletedTodo
+                                  });
+                                }}
                                 className="text-gray-300 hover:text-red-500 transition-colors"
                               >
                                 <span className="material-symbols-outlined text-sm">delete</span>

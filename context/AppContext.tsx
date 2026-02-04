@@ -33,6 +33,11 @@ export interface Toast {
   id: string;
   message: string;
   type: 'success' | 'error' | 'info' | 'warning';
+  // 되돌리기 등 액션 버튼을 지원하기 위한 확장 필드
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 interface AppContextType {
@@ -65,6 +70,7 @@ interface AppContextType {
   addTodo: (todo: Omit<ToDo, 'id'>) => void;
   toggleTodo: (id: string) => void;
   deleteTodo: (id: string) => void;
+  restoreLastDeletedTodo: () => void; // 마지막으로 삭제된 할 일 복구
   
   // Contact Records
   contactRecords: ContactRecord[];
@@ -82,7 +88,7 @@ interface AppContextType {
   
   // Toasts
   toasts: Toast[];
-  showToast: (message: string, type?: Toast['type']) => void;
+  showToast: (message: string, type?: Toast['type'], action?: Toast['action']) => void;
   removeToast: (id: string) => void;
   
   // Settings Modal
@@ -158,6 +164,7 @@ const initialGoals: Goal[] = [
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [todos, setTodos] = useState<ToDo[]>(initialTodos);
+  const [deletedTodos, setDeletedTodos] = useState<ToDo[]>([]); // 삭제된 할 일 임시 저장 (되돌리기용)
   const [contactRecords, setContactRecords] = useState<ContactRecord[]>(initialContactRecords);
   const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>(initialScheduleEvents);
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
@@ -266,8 +273,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setTodos(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
   }, []);
 
+  // 할 일 삭제 - 삭제된 항목을 임시 저장하여 복구 가능하게 함
   const deleteTodo = useCallback((id: string) => {
-    setTodos(prev => prev.filter(t => t.id !== id));
+    setTodos(prev => {
+      const todoToDelete = prev.find(t => t.id === id);
+      if (todoToDelete) {
+        // 삭제할 항목을 deletedTodos에 저장 (최대 1개만 유지)
+        setDeletedTodos([todoToDelete]);
+      }
+      return prev.filter(t => t.id !== id);
+    });
+  }, []);
+
+  // 마지막으로 삭제된 할 일 복구
+  const restoreLastDeletedTodo = useCallback(() => {
+    setDeletedTodos(prev => {
+      if (prev.length > 0) {
+        const todoToRestore = prev[0];
+        setTodos(todos => [...todos, todoToRestore]);
+      }
+      return []; // 복구 후 삭제 목록 비움
+    });
   }, []);
 
   // Contact record operations
@@ -303,13 +329,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   }, []);
 
-  // Toast operations
-  const showToast = useCallback((message: string, type: Toast['type'] = 'info') => {
+  // Toast operations - 액션 버튼(되돌리기 등)을 지원
+  const showToast = useCallback((message: string, type: Toast['type'] = 'info', action?: Toast['action']) => {
     const id = generateId();
-    setToasts(prev => [...prev, { id, message, type }]);
+    setToasts(prev => [...prev, { id, message, type, action }]);
+    // 액션이 있는 경우 5초, 없으면 3초 후 자동 제거
+    const duration = action ? 5000 : 3000;
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3000);
+    }, duration);
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -353,6 +381,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       addTodo,
       toggleTodo,
       deleteTodo,
+      restoreLastDeletedTodo,
       contactRecords,
       addContactRecord,
       scheduleEvents,

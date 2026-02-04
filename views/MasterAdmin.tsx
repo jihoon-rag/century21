@@ -8,6 +8,11 @@ const MasterAdmin: React.FC = () => {
   const { showToast } = useApp();
   const [dateModalOpen, setDateModalOpen] = useState(false);
   const [noticeModalOpen, setNoticeModalOpen] = useState(false);
+  const [pushNotificationModalOpen, setPushNotificationModalOpen] = useState(false);
+  const [pushTitle, setPushTitle] = useState('');
+  const [pushMessage, setPushMessage] = useState('');
+  const [pushTargetType, setPushTargetType] = useState<'all' | 'selected'>('all');
+  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
   
   const kpis = [
     { label: '총 매출', value: '₩1.24B', fullValue: '₩1,240,000,000', change: '+12.5%', color: 'text-green-500' },
@@ -36,6 +41,47 @@ const MasterAdmin: React.FC = () => {
 
   const handleDownloadReport = () => {
     showToast('보고서 다운로드가 시작됩니다.', 'success');
+  };
+
+  // 알림 푸시 모달 초기화 및 열기
+  const openPushModal = () => {
+    setPushTitle('');
+    setPushMessage('');
+    setPushTargetType('all');
+    setSelectedAgents(new Set());
+    setPushNotificationModalOpen(true);
+  };
+
+  // 중개사 선택 토글
+  const toggleAgentSelection = (name: string) => {
+    const newSet = new Set(selectedAgents);
+    if (newSet.has(name)) {
+      newSet.delete(name);
+    } else {
+      newSet.add(name);
+    }
+    setSelectedAgents(newSet);
+  };
+
+  // 알림 푸시 전송
+  const handleSendPushNotification = () => {
+    if (!pushTitle.trim() || !pushMessage.trim()) {
+      showToast('제목과 내용을 입력해주세요.', 'warning');
+      return;
+    }
+    if (pushTargetType === 'selected' && selectedAgents.size === 0) {
+      showToast('발송 대상을 선택해주세요.', 'warning');
+      return;
+    }
+    
+    const targetCount = pushTargetType === 'all' ? agentActivity.length : selectedAgents.size;
+    setPushNotificationModalOpen(false);
+    showToast(`${targetCount}명의 중개사에게 알림이 발송되었습니다.`, 'success');
+    
+    // 상태 초기화
+    setPushTitle('');
+    setPushMessage('');
+    setSelectedAgents(new Set());
   };
 
   return (
@@ -137,6 +183,26 @@ const MasterAdmin: React.FC = () => {
 
         {/* Sidebar Widgets */}
         <div className="space-y-4 lg:space-y-6">
+          {/* 소속 중개사 알림 푸시 카드 */}
+          <div className="bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 p-4 lg:p-6 rounded-2xl border border-primary/20 shadow-sm">
+            <div className="flex items-center justify-between mb-3 lg:mb-4">
+              <h3 className="font-bold text-sm lg:text-base flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-lg lg:text-xl">campaign</span>
+                소속 중개사 알림
+              </h3>
+            </div>
+            <p className="text-[10px] lg:text-xs text-gray-500 dark:text-gray-400 mb-4">
+              소속 공인중개사들에게 공지사항, 업무 지시, 중요 안내 등을 실시간으로 전달할 수 있습니다.
+            </p>
+            <button 
+              onClick={openPushModal}
+              className="w-full py-2.5 lg:py-3 bg-primary text-white rounded-xl font-bold text-xs lg:text-sm shadow-lg shadow-primary/30 hover:brightness-95 transition-all flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-base lg:text-lg">send</span>
+              알림 보내기
+            </button>
+          </div>
+
           <div className="bg-white dark:bg-[#1A1A1A] p-4 lg:p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col">
             <h3 className="text-sm lg:text-lg font-black mb-4 lg:mb-6">중개사별 고객 분포</h3>
             <div className="flex-1 flex flex-col justify-center">
@@ -218,6 +284,129 @@ const MasterAdmin: React.FC = () => {
               <p className="text-xs text-gray-500">{notice.content}</p>
             </div>
           ))}
+        </div>
+      </Modal>
+
+      {/* Push Notification Modal - 소속 중개사 알림 발송 */}
+      <Modal isOpen={pushNotificationModalOpen} onClose={() => setPushNotificationModalOpen(false)} title="소속 중개사 알림 발송" size="md">
+        <div className="space-y-5">
+          {/* 발송 대상 선택 */}
+          <div className="space-y-3">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">발송 대상</label>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setPushTargetType('all')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  pushTargetType === 'all' 
+                    ? 'bg-primary text-white shadow-lg shadow-primary/30' 
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                전체 중개사 ({agentActivity.length}명)
+              </button>
+              <button 
+                onClick={() => setPushTargetType('selected')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  pushTargetType === 'selected' 
+                    ? 'bg-primary text-white shadow-lg shadow-primary/30' 
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                선택 발송
+              </button>
+            </div>
+          </div>
+
+          {/* 선택 발송 시 중개사 목록 */}
+          {pushTargetType === 'selected' && (
+            <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar p-1">
+              {agentActivity.map((agent, i) => (
+                <div 
+                  key={i}
+                  onClick={() => toggleAgentSelection(agent.name)}
+                  className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
+                    selectedAgents.has(agent.name) 
+                      ? 'bg-primary/10 border border-primary/30' 
+                      : 'bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <input 
+                    type="checkbox"
+                    checked={selectedAgents.has(agent.name)}
+                    onChange={() => toggleAgentSelection(agent.name)}
+                    className="rounded text-primary focus:ring-primary size-4"
+                  />
+                  <div className="flex-1">
+                    <p className="text-xs font-bold">{agent.name}</p>
+                    <p className="text-[10px] text-gray-400">고객 {agent.clients}명</p>
+                  </div>
+                  <span className={`text-[10px] font-bold ${agent.status === '온라인' ? 'text-green-500' : 'text-gray-400'}`}>
+                    {agent.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 알림 제목 */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">알림 제목</label>
+            <input 
+              type="text"
+              placeholder="예: 긴급 공지사항"
+              className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm p-3 focus:ring-2 focus:ring-primary"
+              value={pushTitle}
+              onChange={(e) => setPushTitle(e.target.value)}
+            />
+          </div>
+
+          {/* 알림 내용 */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">알림 내용</label>
+            <textarea 
+              placeholder="알림 내용을 입력하세요..."
+              className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm p-3 min-h-[100px] resize-none focus:ring-2 focus:ring-primary"
+              value={pushMessage}
+              onChange={(e) => setPushMessage(e.target.value)}
+            />
+          </div>
+
+          {/* 빠른 템플릿 */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">빠른 템플릿</label>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { title: '시스템 점검', message: '오늘 밤 02:00~04:00 시스템 점검이 예정되어 있습니다.' },
+                { title: '회의 안내', message: '내일 오전 10시 전체 회의가 있습니다. 본사 회의실로 참석 바랍니다.' },
+                { title: '실적 마감', message: '이번 달 실적 마감이 3일 남았습니다. 미제출 건은 서둘러 처리해주세요.' },
+              ].map((tpl, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setPushTitle(tpl.title); setPushMessage(tpl.message); }}
+                  className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg text-[10px] font-bold text-gray-500 hover:bg-primary/10 hover:text-primary transition-all"
+                >
+                  {tpl.title}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 액션 버튼 */}
+          <div className="flex gap-3 pt-2">
+            <button 
+              onClick={() => setPushNotificationModalOpen(false)}
+              className="flex-1 py-3 border border-gray-200 dark:border-gray-700 rounded-xl font-bold text-sm hover:bg-gray-50 transition-all"
+            >
+              취소
+            </button>
+            <button 
+              onClick={handleSendPushNotification}
+              className="flex-1 py-3 bg-primary text-white rounded-xl font-bold text-sm shadow-lg shadow-primary/30 hover:brightness-95 transition-all flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-base">send</span>
+              발송하기
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

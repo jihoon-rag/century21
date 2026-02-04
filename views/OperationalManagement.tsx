@@ -9,7 +9,7 @@ const OperationalManagement: React.FC = () => {
   const [message, setMessage] = useState(`안녕하세요 {고객명}님, Century 21 이동현 에이전트입니다. 요청하신 매물이 새로 등록되어 안내드립니다.`);
   const [isRecipientListOpen, setIsRecipientListOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'editor' | 'preview'>('editor');
-  const [channelTab, setChannelTab] = useState<'sms' | 'email'>('sms');
+  const [channelTab, setChannelTab] = useState<'sms' | 'email' | 'kakao'>('sms');
   const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [template, setTemplate] = useState('new_listing');
@@ -101,9 +101,21 @@ const OperationalManagement: React.FC = () => {
 
   const confirmSend = () => {
     setSendConfirmOpen(false);
-    showToast(`${selectedCount}명에게 ${channelTab === 'sms' ? 'SMS' : '이메일'}이 발송되었습니다.`, 'success');
+    const channelName = channelTab === 'sms' ? 'SMS' : channelTab === 'email' ? '이메일' : '카카오톡 알림';
+    showToast(`${selectedCount}명에게 ${channelName}이 발송되었습니다.`, 'success');
     setSelectedRecipients(new Set());
   };
+
+  // 채널별 바이트 제한 (카카오톡은 1000자 제한)
+  const getByteLimit = () => {
+    switch (channelTab) {
+      case 'kakao': return 1000;
+      case 'email': return 10000;
+      default: return 2000;
+    }
+  };
+
+  const byteLimit = getByteLimit();
 
   const insertVariable = (variable: string) => {
     setMessage(prev => prev + variable);
@@ -203,6 +215,17 @@ const OperationalManagement: React.FC = () => {
               >
                 <span className="material-symbols-outlined text-base lg:text-lg">mail</span> Email
               </button>
+              <button 
+                onClick={() => setChannelTab('kakao')}
+                className={`border-b-2 lg:border-b-4 pb-3 lg:pb-5 px-1 text-xs lg:text-sm font-bold flex items-center gap-1.5 tracking-tighter transition-colors ${channelTab === 'kakao' ? 'border-primary text-secondary dark:text-white' : 'border-transparent text-gray-400'}`}
+              >
+                {/* 카카오톡 아이콘 - SVG 사용 */}
+                <svg className="w-4 h-4 lg:w-5 lg:h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 3C6.48 3 2 6.58 2 11c0 2.83 1.89 5.31 4.71 6.74l-.97 3.6c-.11.41.36.74.71.49l4.4-2.94c.38.04.76.11 1.15.11 5.52 0 10-3.58 10-8 0-4.42-4.48-8-10-8z"/>
+                </svg>
+                <span className="hidden sm:inline">카카오톡</span>
+                <span className="sm:hidden">카톡</span>
+              </button>
             </div>
             {/* Mobile Tab Toggle for Editor/Preview */}
             <div className="flex lg:hidden bg-gray-100 dark:bg-gray-800 p-1 rounded-lg mb-2">
@@ -234,8 +257,12 @@ const OperationalManagement: React.FC = () => {
                 대상 선택 ({selectedCount})
               </button>
               <div className="space-y-1 text-right flex-1 lg:flex-none">
-                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Bytes</p>
-                <p className={`text-xs font-black ${byteCount > 2000 ? 'text-red-500' : 'text-primary'}`}>{byteCount} / 2,000</p>
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                  {channelTab === 'kakao' ? '글자수' : 'Bytes'}
+                </p>
+                <p className={`text-xs font-black ${byteCount > byteLimit ? 'text-red-500' : 'text-primary'}`}>
+                  {channelTab === 'kakao' ? message.length : byteCount} / {byteLimit.toLocaleString()}
+                </p>
               </div>
             </div>
 
@@ -282,28 +309,82 @@ const OperationalManagement: React.FC = () => {
 
           {/* Preview Side */}
           <div className={`w-full xl:w-80 flex-col gap-6 ${activeTab === 'preview' ? 'flex' : 'hidden lg:flex'}`}>
-            <h4 className="text-[10px] lg:text-xs font-black text-gray-400 uppercase tracking-widest text-center lg:text-left">전송 미리보기</h4>
+            <h4 className="text-[10px] lg:text-xs font-black text-gray-400 uppercase tracking-widest text-center lg:text-left">
+              {channelTab === 'kakao' ? '카카오톡 미리보기' : '전송 미리보기'}
+            </h4>
             <div className="relative mx-auto w-full max-w-[220px] lg:max-w-[280px]">
-              <div className="absolute inset-0 -m-1 border-[6px] lg:border-[8px] border-secondary rounded-[36px] lg:rounded-[48px] shadow-2xl z-20 pointer-events-none"></div>
-              <div className="bg-white dark:bg-black w-full aspect-[9/18.5] rounded-[30px] lg:rounded-[42px] overflow-hidden flex flex-col p-4 lg:p-6 shadow-inner relative">
-                <div className="flex justify-between items-center mb-6 lg:mb-10 pt-2">
-                  <span className="text-[8px] lg:text-[10px] font-black dark:text-white">9:41</span>
-                  <div className="flex gap-1 items-center dark:text-white text-[10px]">
-                    <span className="material-symbols-outlined text-[10px] lg:text-[12px]">signal_cellular_4_bar</span>
-                    <span className="material-symbols-outlined text-[10px] lg:text-[12px]">battery_full</span>
+              {/* 카카오톡 미리보기 */}
+              {channelTab === 'kakao' ? (
+                <>
+                  <div className="absolute inset-0 -m-1 border-[6px] lg:border-[8px] border-[#391B1B] rounded-[36px] lg:rounded-[48px] shadow-2xl z-20 pointer-events-none"></div>
+                  <div className="bg-[#B2C7D9] w-full aspect-[9/18.5] rounded-[30px] lg:rounded-[42px] overflow-hidden flex flex-col shadow-inner relative">
+                    {/* 카카오톡 상단 바 */}
+                    <div className="bg-[#B2C7D9] px-4 lg:px-6 py-3 lg:py-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[8px] lg:text-[10px] font-black text-gray-700">9:41</span>
+                        <div className="flex gap-1 items-center text-gray-700 text-[10px]">
+                          <span className="material-symbols-outlined text-[10px] lg:text-[12px]">signal_cellular_4_bar</span>
+                          <span className="material-symbols-outlined text-[10px] lg:text-[12px]">battery_full</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="material-symbols-outlined text-gray-600 text-sm">arrow_back</span>
+                        <span className="text-[10px] lg:text-xs font-bold text-gray-800">Century 21 부동산</span>
+                        <span className="material-symbols-outlined text-gray-600 text-sm">search</span>
+                      </div>
+                    </div>
+                    {/* 채팅 영역 */}
+                    <div className="flex-1 p-3 lg:p-4 overflow-hidden">
+                      <div className="flex gap-2 items-end">
+                        {/* 프로필 이미지 */}
+                        <div className="size-8 lg:size-10 rounded-full bg-[#FEE500] flex items-center justify-center shrink-0 shadow-md">
+                          <svg className="w-5 h-5 lg:w-6 lg:h-6 text-[#391B1B]" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 3C6.48 3 2 6.58 2 11c0 2.83 1.89 5.31 4.71 6.74l-.97 3.6c-.11.41.36.74.71.49l4.4-2.94c.38.04.76.11 1.15.11 5.52 0 10-3.58 10-8 0-4.42-4.48-8-10-8z"/>
+                          </svg>
+                        </div>
+                        <div className="flex flex-col gap-1 max-w-[75%]">
+                          <span className="text-[9px] lg:text-[10px] font-bold text-gray-700 ml-1">Century 21</span>
+                          <div className="bg-white p-3 rounded-xl rounded-tl-sm text-[10px] lg:text-[11px] leading-relaxed font-medium shadow-sm text-gray-800 whitespace-pre-wrap break-words">
+                            {message.replace('{고객명}', '홍길동')}
+                          </div>
+                          <span className="text-[8px] text-gray-500 ml-1">오후 2:30</span>
+                        </div>
+                      </div>
+                    </div>
+                    {/* 하단 바 */}
+                    <div className="bg-white/80 px-3 py-2 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-gray-400 text-lg">add</span>
+                      <div className="flex-1 bg-gray-100 rounded-full px-3 py-1.5 text-[10px] text-gray-400">메시지 입력</div>
+                      <span className="material-symbols-outlined text-gray-400 text-lg">sentiment_satisfied</span>
+                    </div>
+                    <div className="h-0.5 lg:h-1 w-1/3 bg-gray-400 rounded-full mx-auto mb-1"></div>
                   </div>
-                </div>
-                <div className="space-y-4 lg:space-y-6 flex-1 min-w-0">
-                   <div className="flex items-center gap-1.5">
-                      <div className="size-5 lg:size-6 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0"><span className="material-symbols-outlined text-[12px] lg:text-[14px]">person</span></div>
-                      <span className="text-[9px] lg:text-[10px] font-black tracking-tight dark:text-white truncate">Century 21</span>
-                   </div>
-                   <div className="bg-gray-100 dark:bg-gray-800 p-3 lg:p-4 rounded-xl lg:rounded-2xl rounded-tl-none text-[10px] lg:text-[11px] leading-relaxed font-medium shadow-sm dark:text-gray-300 whitespace-pre-wrap break-words">
-                      {message.replace('{고객명}', '홍길동')}
-                   </div>
-                </div>
-                <div className="h-0.5 lg:h-1 w-1/3 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto mt-auto mb-1"></div>
-              </div>
+                </>
+              ) : (
+                /* SMS/Email 미리보기 (기존) */
+                <>
+                  <div className="absolute inset-0 -m-1 border-[6px] lg:border-[8px] border-secondary rounded-[36px] lg:rounded-[48px] shadow-2xl z-20 pointer-events-none"></div>
+                  <div className="bg-white dark:bg-black w-full aspect-[9/18.5] rounded-[30px] lg:rounded-[42px] overflow-hidden flex flex-col p-4 lg:p-6 shadow-inner relative">
+                    <div className="flex justify-between items-center mb-6 lg:mb-10 pt-2">
+                      <span className="text-[8px] lg:text-[10px] font-black dark:text-white">9:41</span>
+                      <div className="flex gap-1 items-center dark:text-white text-[10px]">
+                        <span className="material-symbols-outlined text-[10px] lg:text-[12px]">signal_cellular_4_bar</span>
+                        <span className="material-symbols-outlined text-[10px] lg:text-[12px]">battery_full</span>
+                      </div>
+                    </div>
+                    <div className="space-y-4 lg:space-y-6 flex-1 min-w-0">
+                       <div className="flex items-center gap-1.5">
+                          <div className="size-5 lg:size-6 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0"><span className="material-symbols-outlined text-[12px] lg:text-[14px]">person</span></div>
+                          <span className="text-[9px] lg:text-[10px] font-black tracking-tight dark:text-white truncate">Century 21</span>
+                       </div>
+                       <div className="bg-gray-100 dark:bg-gray-800 p-3 lg:p-4 rounded-xl lg:rounded-2xl rounded-tl-none text-[10px] lg:text-[11px] leading-relaxed font-medium shadow-sm dark:text-gray-300 whitespace-pre-wrap break-words">
+                          {message.replace('{고객명}', '홍길동')}
+                       </div>
+                    </div>
+                    <div className="h-0.5 lg:h-1 w-1/3 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto mt-auto mb-1"></div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -320,9 +401,20 @@ const OperationalManagement: React.FC = () => {
             <button 
               onClick={handleSend}
               disabled={selectedCount === 0}
-              className={`flex-[2] lg:flex-1 py-3 lg:py-4 bg-primary text-white rounded-xl lg:rounded-2xl text-[10px] lg:text-xs font-black shadow-xl shadow-primary/30 transition-all flex items-center justify-center gap-2 uppercase tracking-tighter ${selectedCount === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:brightness-95'}`}
+              className={`flex-[2] lg:flex-1 py-3 lg:py-4 rounded-xl lg:rounded-2xl text-[10px] lg:text-xs font-black shadow-xl transition-all flex items-center justify-center gap-2 uppercase tracking-tighter ${
+                channelTab === 'kakao' 
+                  ? 'bg-[#FEE500] text-[#391B1B] shadow-yellow-300/30' 
+                  : 'bg-primary text-white shadow-primary/30'
+              } ${selectedCount === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:brightness-95'}`}
             >
-              <span className="material-symbols-outlined text-base">send</span> 지금 발송 ({selectedCount}명)
+              {channelTab === 'kakao' ? (
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 3C6.48 3 2 6.58 2 11c0 2.83 1.89 5.31 4.71 6.74l-.97 3.6c-.11.41.36.74.71.49l4.4-2.94c.38.04.76.11 1.15.11 5.52 0 10-3.58 10-8 0-4.42-4.48-8-10-8z"/>
+                </svg>
+              ) : (
+                <span className="material-symbols-outlined text-base">send</span>
+              )}
+              {channelTab === 'kakao' ? '카톡 발송' : '지금 발송'} ({selectedCount}명)
             </button>
           </div>
         </div>
@@ -332,7 +424,7 @@ const OperationalManagement: React.FC = () => {
       <Modal isOpen={sendConfirmOpen} onClose={() => setSendConfirmOpen(false)} title="발송 확인" size="sm">
         <div className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            <span className="font-bold text-primary">{selectedCount}명</span>에게 {channelTab === 'sms' ? 'SMS' : '이메일'}을 발송하시겠습니까?
+            <span className="font-bold text-primary">{selectedCount}명</span>에게 {channelTab === 'sms' ? 'SMS' : channelTab === 'email' ? '이메일' : '카카오톡 알림'}을 발송하시겠습니까?
           </p>
           <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-xl text-xs text-gray-500 max-h-32 overflow-y-auto">
             {message.substring(0, 100)}...
@@ -358,13 +450,17 @@ const OperationalManagement: React.FC = () => {
       <Modal isOpen={testSendOpen} onClose={() => setTestSendOpen(false)} title="테스트 발송" size="sm">
         <div className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            테스트 발송할 번호를 입력하세요.
+            {channelTab === 'kakao' 
+              ? '테스트 발송할 카카오톡 계정을 입력하세요.' 
+              : channelTab === 'email'
+              ? '테스트 발송할 이메일 주소를 입력하세요.'
+              : '테스트 발송할 번호를 입력하세요.'}
           </p>
           <input 
             type="text"
-            placeholder="010-0000-0000"
+            placeholder={channelTab === 'kakao' ? 'kakao_id' : channelTab === 'email' ? 'test@email.com' : '010-0000-0000'}
             className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm p-3"
-            defaultValue="010-1234-5678"
+            defaultValue={channelTab === 'kakao' ? 'century21_agent' : channelTab === 'email' ? 'test@century21.com' : '010-1234-5678'}
           />
           <div className="flex gap-3 pt-4">
             <button 
